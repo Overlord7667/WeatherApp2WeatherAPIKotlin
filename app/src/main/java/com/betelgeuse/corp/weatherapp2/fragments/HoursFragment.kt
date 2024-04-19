@@ -29,7 +29,6 @@ class HoursFragment : Fragment() {
         savedInstanceState: Bundle?
     ): View {
         binding = FragmentHoursBinding.inflate(inflater,container, false)
-//        return inflater.inflate(R.layout.fragment_hours, container, false)
         return binding.root
     }
 

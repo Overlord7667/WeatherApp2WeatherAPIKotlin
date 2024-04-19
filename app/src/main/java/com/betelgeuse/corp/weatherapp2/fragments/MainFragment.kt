@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.LocationManager
-import android.media.audiofx.Equalizer.Settings
 import android.os.Bundle
 import android.util.Log
 import androidx.fragment.app.Fragment
@@ -18,26 +17,27 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.ActivityCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.activityViewModels
-import androidx.lifecycle.observe
+import com.android.volley.NetworkResponse
+import com.android.volley.ParseError
 import com.android.volley.Request
+import com.android.volley.Response
+import com.android.volley.toolbox.HttpHeaderParser
 import com.android.volley.toolbox.StringRequest
 import com.android.volley.toolbox.Volley
 import com.betelgeuse.corp.weatherapp2.DialogManager
 import com.betelgeuse.corp.weatherapp2.MainViewModel
-import com.betelgeuse.corp.weatherapp2.R
 import com.betelgeuse.corp.weatherapp2.adapters.VpAdapter
 import com.betelgeuse.corp.weatherapp2.adapters.WeatherModel
 import com.betelgeuse.corp.weatherapp2.databinding.FragmentMainBinding
 import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
 import com.google.android.material.tabs.TabLayoutMediator
 import com.squareup.picasso.Picasso
 import org.json.JSONObject
+import java.nio.charset.Charset
 import java.util.ArrayList
-import java.util.Objects
 
 const val API_KEY = "8d4ddd9f6e9a4307ad983119241603"
 
@@ -156,29 +156,43 @@ class MainFragment : Fragment() {
             pLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
         }
     }
+private fun requestWeatherData(city: String){
+    val url = "http://api.weatherapi.com/v1/forecast.json?key=" +
+            API_KEY +
+            "&q=" +
+            city +
+            "&days=" +
+            "5" +
+            "&aqi=no&alerts=no"
 
-    private fun requestWeatherData(city: String){
-        val url = "http://api.weatherapi.com/v1/forecast.json?key=" +
-                API_KEY +
-                "&q=" +
-                city +
-                "&days=" +
-                "5" +
-                "&aqi=no&alerts=no"
-        val queue = Volley.newRequestQueue(context)
-        val request = StringRequest(
-            Request.Method.GET,
-            url,
-            {
-                result -> parseWeatherData(result)
-//                result -> Log.d("MyLog", "Result: $result")
-            },
-            {
-                error -> Log.d("MyLog", "Error: $error")
+    val request = object : Request<ByteArray>(
+        Method.GET,
+        url,
+        Response.ErrorListener { error ->
+            Log.d("MyLog", "Error: $error")
+        }) {
+        override fun parseNetworkResponse(response: NetworkResponse?): Response<ByteArray> {
+            return if (response != null) {
+                Response.success(response.data, HttpHeaderParser.parseCacheHeaders(response))
+            } else {
+                Response.error(ParseError())
             }
-        )
-        queue.add(request)
+        }
+
+        override fun deliverResponse(response: ByteArray?) {
+            // Преобразование массива байт в строку с указанием кодировки
+            val resultString = response?.toString(Charset.forName("UTF-8"))
+            if (resultString != null) {
+                parseWeatherData(resultString)
+            } else {
+                Log.d("MyLog", "Error: Unable to parse response")
+            }
+        }
     }
+
+    val queue = Volley.newRequestQueue(context)
+    queue.add(request)
+}
 
     private fun parseWeatherData(result: String) {
         val mainObject = JSONObject(result)
